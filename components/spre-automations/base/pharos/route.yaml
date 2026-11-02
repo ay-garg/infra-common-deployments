@@ -9,12 +9,13 @@ metadata:
     haproxy.router.openshift.io/timeout: 300s
 spec:
   port:
-    targetPort: http
+    targetPort: https
   to:
     kind: Service
     name: pharos
     weight: 100
+  # SPRE-7088: TLS ends at kube-rbac-proxy, so the router re-encrypts.
   tls:
-    termination: edge
+    termination: reencrypt
     insecureEdgeTerminationPolicy: Redirect
   wildcardPolicy: None

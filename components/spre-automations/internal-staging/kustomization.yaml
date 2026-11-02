@@ -7,10 +7,18 @@ resources:
 - external-secrets
 - ../base/pharos
 # Konflux build of pharos d5af72c (spre-sre/pharos PR #49, SPRE-7074).
+# SPRE-7088: this build has no trusted-proxy mode, so it ignores
+# LUMINO_TRUSTED_PROXY and calls through the Route get 421. Replace the digest
+# with the SPRE-7088 build before applying this branch.
+# kube-rbac-proxy is the multi-arch index digest of
+# registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9:v4.19.
 images:
 - name: quay.io/redhat-user-workloads/spre-tenant/pharos
   newName: quay.io/redhat-user-workloads/spre-tenant/pharos
   digest: sha256:9a2c5db1181f1bc936179b2a85916608efa334e362a1635d5017a7dac8049b3b
+- name: registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9
+  newName: registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9
+  digest: sha256:cc9ca912e17cf7419f40b14aa5708b7001ffd1136996f9909bdfe01e12a4048a
 patches:
 - path: route-patch.yaml
 - path: pharos-deployment-patch.yaml

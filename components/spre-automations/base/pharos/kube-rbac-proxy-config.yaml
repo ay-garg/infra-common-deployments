@@ -1,0 +1,18 @@
+---
+# SPRE-7088: kube-rbac-proxy authorizes every request against this one
+# resource attribute, so a caller needs create on services/proxy named pharos.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pharos-kube-rbac-proxy-config
+  labels:
+    app: pharos
+data:
+  config.yaml: |
+    authorization:
+      resourceAttributes:
+        namespace: spre-automations
+        apiGroup: ""
+        resource: services
+        subresource: proxy
+        name: pharos

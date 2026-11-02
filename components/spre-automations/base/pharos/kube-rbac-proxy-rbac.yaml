@@ -1,0 +1,40 @@
+---
+# SPRE-7088: the kube-rbac-proxy sidecar runs as pharos-reader and must be able
+# to create TokenReviews and SubjectAccessReviews.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pharos-reader-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: pharos-reader
+    namespace: spre-automations
+---
+# ClusterRole view (spre-automations-viewers) does not include services/proxy,
+# so MCP clients get this Role instead.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pharos-mcp-client
+rules:
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["pharos"]
+    verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spre-automations-mcp-clients
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pharos-mcp-client
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: sp-resilience-team

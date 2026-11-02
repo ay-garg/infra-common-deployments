@@ -38,41 +38,33 @@ spec:
           env:
             - name: LUMINO_TRANSPORT
               value: streamable-http
+            # SPRE-7088: only the loopback-bound proxy may reach Pharos. A
+            # non-loopback bind with LUMINO_TRUSTED_PROXY is rejected at start.
             - name: LUMINO_BIND_HOST
-              value: 0.0.0.0
+              value: 127.0.0.1
             - name: LUMINO_BIND_PORT
               value: "8000"
             - name: LUMINO_STATELESS_HTTP
               value: "true"
+            # SPRE-7088: trust the x-remote-user header that kube-rbac-proxy
+            # sets and drop Pharos' own bearer check (LUMINO_HTTP_TOKEN is
+            # removed below; setting both is a startup error).
+            - name: LUMINO_TRUSTED_PROXY
+              value: "true"
             - name: LUMINO_CONFIG
               value: /etc/pharos/config.yaml
-            - name: LUMINO_HTTP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: pharos-secrets
-                  key: LUMINO_HTTP_TOKEN
-          volumeMounts:
-            - name: pharos-config
-              mountPath: /etc/pharos
-              readOnly: true
-            - name: tmp
-              mountPath: /tmp
-            - name: cache
-              mountPath: /opt/app-root/src/.cache
-            - name: logs
-              mountPath: /opt/app-root/src/logs
+          # Pharos binds loopback, so httpGet against the pod IP cannot work.
+          # curl is part of the Containerfile.
           livenessProbe:
-            httpGet:
-              path: /health
-              port: http
+            exec:
+              command: ["curl", "-fsS", "http://127.0.0.1:8000/health"]
             initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
-            httpGet:
-              path: /health
-              port: http
+            exec:
+              command: ["curl", "-fsS", "http://127.0.0.1:8000/health"]
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
@@ -84,6 +76,69 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
+          volumeMounts:
+            - name: pharos-config
+              mountPath: /etc/pharos
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /opt/app-root/src/.cache
+            - name: logs
+              mountPath: /opt/app-root/src/logs
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+        # SPRE-7088: terminates TLS, authenticates the token, authorizes
+        # services/proxy named pharos, then forwards with x-remote-user.
+        - name: kube-rbac-proxy
+          # Overlay pins the digest; tag and digest are both v4.19.
+          image: registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9:v4.19
+          imagePullPolicy: IfNotPresent
+          args:
+            - --secure-listen-address=0.0.0.0:8443
+            - --upstream=http://127.0.0.1:8000/
+            # Default audience of in-cluster ServiceAccount tokens on
+            # OpenShift. The pharos audience is for tokens minted explicitly
+            # with --audience=pharos.
+            - --auth-token-audiences=pharos,https://kubernetes.default.svc
+            - --auth-header-fields-enabled
+            - --allow-paths=/mcp,/health
+            - --config-file=/etc/kube-rbac-proxy/config.yaml
+            - --tls-cert-file=/etc/tls/tls.crt
+            - --tls-private-key-file=/etc/tls/tls.key
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: https
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: proxy-config
+              mountPath: /etc/kube-rbac-proxy
+              readOnly: true
+            # Written by service-ca, see the Service annotation.
+            - name: proxy-tls
+              mountPath: /etc/tls
+              readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -97,6 +152,12 @@ spec:
         - name: pharos-config
           configMap:
             name: pharos-config
+        - name: proxy-config
+          configMap:
+            name: pharos-kube-rbac-proxy-config
+        - name: proxy-tls
+          secret:
+            secretName: pharos-proxy-tls
         - name: tmp
           emptyDir: {}
         - name: cache

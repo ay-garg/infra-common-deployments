@@ -5,11 +5,15 @@ metadata:
   name: pharos
   labels:
     app: pharos
+  annotations:
+    # SPRE-7088: service-ca issues the kube-rbac-proxy serving certificate into
+    # this secret, which the router trusts for reencrypt.
+    service.beta.openshift.io/serving-cert-secret-name: pharos-proxy-tls
 spec:
   selector:
     app: pharos
   ports:
-    - name: http
-      port: 8000
+    - name: https
+      port: 8443
       protocol: TCP
-      targetPort: http
+      targetPort: https
