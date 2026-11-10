@@ -23,3 +23,9 @@ patches:
 - path: route-patch.yaml
 - path: pharos-deployment-patch.yaml
 - path: pharos-configmap-patch.yaml
+- path: pharos-audience-patch.yaml
+  target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: pharos

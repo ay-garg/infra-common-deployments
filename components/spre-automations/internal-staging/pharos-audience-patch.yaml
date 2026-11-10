@@ -1,0 +1,9 @@
+---
+# SPRE-7088: the API audience can differ per cluster. Replace the value with
+# the one measured on kflux-c-stg-i01 (4.19) before applying to stage.
+- op: test
+  path: /spec/template/spec/containers/1/name
+  value: kube-rbac-proxy
+- op: add
+  path: /spec/template/spec/containers/1/args/-
+  value: --auth-token-audiences=pharos,https://kubernetes.default.svc

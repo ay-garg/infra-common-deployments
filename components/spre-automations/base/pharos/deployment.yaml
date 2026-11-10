@@ -104,10 +104,8 @@ spec:
           args:
             - --secure-listen-address=0.0.0.0:8443
             - --upstream=http://127.0.0.1:8000/
-            # Default audience of in-cluster ServiceAccount tokens on
-            # OpenShift. The pharos audience is for tokens minted explicitly
-            # with --audience=pharos.
-            - --auth-token-audiences=pharos,https://kubernetes.default.svc
+            # --auth-token-audiences is set per cluster in the overlay
+            # (internal-staging), because the API audience differs.
             - --auth-header-fields-enabled
             - --allow-paths=/mcp,/health
             - --config-file=/etc/kube-rbac-proxy/config.yaml
